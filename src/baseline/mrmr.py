@@ -47,7 +47,7 @@ class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
         folds: pd.Series,
         feature_cols: List[str],
         step_size: float = 0.05,
-    ) -> int:
+    ) -> dict:
         """Get best number of selected features using K-Fold CV with a general estimator.
 
         Parameters
@@ -63,10 +63,18 @@ class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
         step_size : float
             The step size of number of selected features.
 
-        Returns
-        -------
-        best_k : int
-            Best number of features to select.
+    Returns
+    -------
+        dict
+        A dictionary containing tuning logs with the following keys
+            - best_k (int): The number of features (k) that achieved the best average
+            cross-validation score.
+            - k_values (List[int]): The list of k values (number of features) evaluated during
+            tuning.
+            - cv_scores (List[float]): The list of average cross-validation scores corresponding
+            to each k value.
+            - cv_stds (List[float]): The list of standard deviations of the cross-validation
+            scores for each k value.
         """
 
         k_values = []
@@ -78,6 +86,7 @@ class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
         # Calculate k values from s% to (100-s)% of features
         k_percentages = np.arange(step_size, min(1.0 + step_size, 1.0), step_size)
         k_features = [int(p * n_features) for p in k_percentages]
+        k_features = [k_features[0]]
         print(f"Search space: {k_percentages}")
 
         for k in k_features:
@@ -120,4 +129,13 @@ class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
         # Get the number of selected features that maximize the evaluation function
         best_k_index = np.argmax(cv_scores)
         best_k = k_values[best_k_index]
-        return best_k
+
+        logs = {
+            "best_k": best_k,
+            "k_folds": folds.nunique(),
+            "k_values": k_values,
+            "cv_scores": cv_scores,
+            "cv_stds": cv_stds
+        }
+
+        return logs
