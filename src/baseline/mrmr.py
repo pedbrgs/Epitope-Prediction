@@ -1,36 +1,46 @@
-from typing import Tuple, List, Callable
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 from mrmr import mrmr_classif
+from .base import BaselineFeatureSelector
 from sklearn.base import ClassifierMixin
 
 
-class MRMR():
-    """Minimum Redundancy and Maximum Relevance (MRMR) feature selection algorithm.
+class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
+    """Minimum Redundancy and Maximum Relevance (MRMR)."""
 
-    Attributes
-    ----------
-    estimator : ClassifierMixin
-        A fitted classifier with `predict` and `predict_proba` methods.
-    eval_function : Callable
-        A function with signature `eval_function(y_true, y_pred)` that returns a scalar score.
-    random_state : int, optional
-        Random seed used to initialize the estimator, by default 42.
-    """
+    __name__ = "MRMR"
 
-    def __init__(
+    def fit(
         self,
         estimator: ClassifierMixin,
-        eval_function: Callable,
-        random_state: int = 1234
-    ):
-        """Init MRMR Baseline class."""
-        self.estimator = estimator
-        self.eval_function = eval_function
-        self.random_state = random_state
+        X_train: pd.DataFrame,
+        y_train: pd.DataFrame,
+        n_features: int
+    ) -> Tuple[ClassifierMixin, List[str]]:
+        """Fit the estimator using the best number of selected features.
 
-    def tuning(
+        Parameters
+        ----------
+        X_train : pd.DataFrame
+            DataFrame containing all feature columns.
+        y_train : pd.DataFrame
+            Series or DataFrame with the target variable.
+        n_features : int
+            Best number of features to select.
+
+        Returns
+        -------
+        Tuple[ClassifierMixin, List[str]]
+            - Estimator fitted with the selected features.
+            - The selected feature names.
+        """
+        selected_features = mrmr_classif(X=X_train, y=y_train, K=n_features)
+        X_train_selected = X_train[selected_features].copy()
+        return estimator.fit(X_train_selected, y_train), selected_features
+
+    def tune(
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
@@ -66,17 +76,18 @@ class MRMR():
         n_features = len(feature_cols)
 
         # Calculate k values from s% to (100-s)% of features
-        k_percentages = np.arange(step_size, 1.0, step_size)
+        k_percentages = np.arange(step_size, min(1.0 + step_size, 1.0), step_size)
         k_features = [int(p * n_features) for p in k_percentages]
         print(f"Search space: {k_percentages}")
 
         for k in k_features:
-            print(f"\nEvaluating MRMR with k={k} features ({k/n_features*100:.1f}%)")
+            print(f"\nEvaluating {self.__name__} with k={k} features ({k/n_features*100:.1f}%)")
 
             fold_scores = []
 
             for fold in folds.unique():
                 print(f"Fold: {fold+1}/{folds.nunique()}")
+                estimator = self._reset_estimator()
 
                 # Split into train and validation
                 fold_train = folds != fold
@@ -90,16 +101,18 @@ class MRMR():
                 )
 
                 # Train an estimator
-                self.estimator.fit(X_train[selected_features][fold_train], y_train[fold_train])
+                estimator.fit(X_train[selected_features][fold_train], y_train[fold_train])
 
                 # Predict and evaluate
-                y_pred = self.estimator.predict(X_train[selected_features][fold_val])
+                y_pred = estimator.predict(X_train[selected_features][fold_val])
                 score = self.eval_function(y_true=y_train[fold_val], y_pred=y_pred)
                 fold_scores.append(score)
 
-            cv_score, cv_std = np.mean(fold_scores), np.std(fold_scores)
+                del estimator
+
+            cv_score, cv_std = round(np.mean(fold_scores), 4), round(np.std(fold_scores), 4)
             print(f"{self.eval_function.__name__}: {cv_score} +- {cv_std}")
-        
+
             k_values.append(k)
             cv_scores.append(cv_score)
             cv_stds.append(cv_std)
