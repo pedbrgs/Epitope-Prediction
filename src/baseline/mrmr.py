@@ -86,7 +86,6 @@ class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
         # Calculate k values from s% to (100-s)% of features
         k_percentages = np.arange(step_size, min(1.0 + step_size, 1.0), step_size)
         k_features = [int(p * n_features) for p in k_percentages]
-        k_features = [k_features[0]]
         print(f"Search space: {k_percentages}")
 
         for k in k_features:
@@ -132,7 +131,6 @@ class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
 
         logs = {
             "best_k": best_k,
-            "k_folds": folds.nunique(),
             "k_values": k_values,
             "cv_scores": cv_scores,
             "cv_stds": cv_stds
