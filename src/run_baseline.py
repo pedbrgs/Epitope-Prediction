@@ -10,10 +10,10 @@ from sklearn.metrics import balanced_accuracy_score
 
 from baseline.mrmr import MinimumRedundancyMaximumRelevance
 from baseline.rfe import RecursiveFeatureElimination
-from evaluation.testing import holdout_eval
-from evaluation.metrics import compute_stability_jaccard
-from data.utils import read_parquet_data
 from data.splitting import input_output_split, train_test_split
+from data.utils import read_parquet_data
+from evaluation.metrics import compute_stability_jaccard
+from evaluation.testing import holdout_eval
 
 
 def parse_args():

@@ -1,7 +1,9 @@
 import copy
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, List
 
+import numpy as np
+import pandas as pd
 from sklearn.base import ClassifierMixin
 
 
@@ -11,11 +13,11 @@ class BaselineFeatureSelector(ABC):
     Attributes
     ----------
     estimator : ClassifierMixin
-        A fitted classifier with `predict` and `predict_proba` methods.
+        An unfitted classifier with `predict` and `predict_proba` methods.
     eval_function : Callable
         A function with signature `eval_function(y_true, y_pred)` that returns a scalar score.
     random_state : int, optional
-        Random seed used to initialize the estimator, by default 42.
+        Random seed used to initialize the estimator and/or selector, by default 1234.
     """
 
     def __init__(
@@ -29,16 +31,161 @@ class BaselineFeatureSelector(ABC):
         self.eval_function = eval_function
         self.random_state = random_state
 
+    @abstractmethod
+    def _select_features(self, X_train, y_train, n_features, **kwargs) -> List[str]:
+        """Abstract method to select features. Must be implemented in subclass.
+
+        Parameters
+        ----------
+        X_train : pd.DataFrame
+        y_train : pd.Series
+        n_features : int
+        **kwargs : dict
+            Additional arguments required by the specific selector.
+        """
+        pass
+
     def _reset_estimator(self) -> ClassifierMixin:
-        """Reset a fitted estimator to an unfitted estimator."""
+        """Return a fresh, unfitted copy of the base estimator.
+
+        This method creates a deep copy of the original base estimator to reset any fitted
+        parameters, ensuring the returned estimator is in its initial state.
+
+        Returns
+        -------
+        ClassifierMixin
+            An unfitted copy of the base estimator.
+        """
         return copy.deepcopy(self.base_estimator)
 
-    @abstractmethod
-    def tune(self):
-        """Tune the hyperparameters of the feature selection method."""
-        pass
+    def fit(
+            self,
+            X_train: pd.DataFrame,
+            y_train: pd.Series,
+            estimator: ClassifierMixin,
+            selected_features: List[str]
+        ) -> ClassifierMixin:
+        """Fit an estimator using the features selected by the baseline algorithm.
 
-    @abstractmethod
-    def fit(self):
-        """Fit the feature selection method with the best hyperparameters."""
-        pass
+        Parameters
+        ----------
+        X_train : pd.DataFrame
+            DataFrame containing all feature columns.
+        y_train : pd.DataFrame
+            Series or DataFrame with the target variable.
+        estimator : ClassifierMixin
+            Unfitted classifier with `predict` and `predict_proba` methods.
+        selected_features : List[str]
+            Name of the best features selected.
+
+        Returns
+        -------
+        ClassifierMixin
+            Classifier fitted with the selected features.
+        """
+        X_train_selected = X_train[selected_features].copy()
+        return estimator.fit(X_train_selected, y_train)
+
+    def tune(
+        self,
+        X_train: pd.DataFrame,
+        y_train: pd.DataFrame,
+        folds: pd.Series,
+        feature_cols: List[str],
+        step_size: float = 0.05,
+    ) -> dict:
+        """Get best number of selected features using K-Fold CV with a general estimator.
+
+        Parameters
+        ----------
+        X_train : pd.DataFrame
+            DataFrame containing all feature columns.
+        y_train : pd.DataFrame
+            Series or DataFrame with the target variable.
+        folds : pd.Series
+            A Series indicating the fold assignment for each sample (e.g., fold IDs).
+        feature_cols : List[str]
+            The list of feature names.
+        step_size : float
+            The step size of number of selected features.
+
+    Returns
+    -------
+        dict
+        A dictionary containing tuning logs with the following keys
+            - best_k (int): The number of features (k) that achieved the best average
+            cross-validation score.
+            - k_values (List[int]): The list of k values (number of features) evaluated during
+            tuning.
+            - cv_scores (List[float]): The list of average cross-validation scores corresponding
+            to each k value.
+            - cv_stds (List[float]): The list of standard deviations of the cross-validation
+            scores for each k value.
+        """
+        k_values = []
+        cv_scores = []
+        cv_stds = []
+
+        n_features = len(feature_cols)
+
+        # Calculate k values from s% to (100-s)% of features
+        n_steps = int(1.0 / step_size)
+        k_percentages = np.linspace(step_size, 1.0, n_steps)
+        k_features = [int(p * n_features) for p in k_percentages]
+        print(f"Search space: {k_percentages}")
+
+        for k in k_features:
+            print(f"\nEvaluating {self.__name__} with k={k} features ({k/n_features*100:.1f}%)")
+
+            fold_scores = []
+
+            for fold in folds.unique():
+                print(f"Fold: {fold+1}/{folds.nunique()}")
+                estimator = self._reset_estimator()
+
+                # Split into train and validation
+                fold_train = folds != fold
+                fold_val = folds == fold
+
+                # Run feature selection
+                selected_features = self._select_features(
+                    X_train=X_train[fold_train],
+                    y_train=y_train[fold_train],
+                    n_features=k,
+                    estimator=estimator
+                )
+
+                # Train an estimator
+                estimator = self.fit(
+                    X_train=X_train[fold_train],
+                    y_train=y_train[fold_train],
+                    estimator=estimator,
+                    selected_features=selected_features
+                )
+
+                # Predict and evaluate
+                y_pred = estimator.predict(X_train[selected_features][fold_val])
+                score = self.eval_function(y_true=y_train[fold_val], y_pred=y_pred)
+                fold_scores.append(score)
+
+                del estimator
+
+            cv_score, cv_std = round(np.mean(fold_scores), 4), round(np.std(fold_scores), 4)
+            print(f"{self.eval_function.__name__}: {cv_score} +- {cv_std}")
+
+            k_values.append(k)
+            cv_scores.append(cv_score)
+            cv_stds.append(cv_std)
+
+        # Get the number of selected features that maximize the evaluation function
+        best_k_index = np.argmax(cv_scores)
+        best_k = k_values[best_k_index]
+
+        logs = {
+            "best_k": best_k,
+            "k_values": k_values,
+            "cv_scores": cv_scores,
+            "cv_stds": cv_stds
+        }
+
+        return logs
