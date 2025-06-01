@@ -32,7 +32,7 @@ class BaselineFeatureSelector(ABC):
         self.random_state = random_state
 
     @abstractmethod
-    def _select_features(self, X_train, y_train, n_features, **kwargs) -> List[str]:
+    def select(self, X_train, y_train, n_features, **kwargs) -> List[str]:
         """Abstract method to select features. Must be implemented in subclass.
 
         Parameters
@@ -130,7 +130,7 @@ class BaselineFeatureSelector(ABC):
 
         # Calculate k values from s% to (100-s)% of features
         n_steps = int(1.0 / step_size)
-        k_percentages = np.linspace(step_size, 1.0, n_steps)
+        k_percentages = np.linspace(step_size, 1.0, n_steps)[:-1]
         k_features = [int(p * n_features) for p in k_percentages]
         print(f"Search space: {k_percentages}")
 
@@ -148,7 +148,7 @@ class BaselineFeatureSelector(ABC):
                 fold_val = folds == fold
 
                 # Run feature selection
-                selected_features = self._select_features(
+                selected_features = self.select(
                     X_train=X_train[fold_train],
                     y_train=y_train[fold_train],
                     n_features=k,

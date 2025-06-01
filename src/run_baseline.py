@@ -168,13 +168,20 @@ def main(args):
         estimator = RandomForestClassifier(random_state=random_state, n_jobs=-1)
 
         start_time = time.time()
-        best_estimator, selected_features = baseline.fit(
-            estimator=estimator,
+        selected_features = baseline.select(
             X_train=X_train,
             y_train=y_train,
-            n_features=logs["best_k"]
+            n_features=logs["best_k"],
+            estimator=estimator
         )
         run_time = time.time() - start_time
+
+        best_estimator = baseline.fit(
+            X_train=X_train,
+            y_train=y_train,
+            estimator=estimator,
+            selected_features=selected_features
+        )
 
         print("Evaluating model...")
         result = holdout_eval(

@@ -11,7 +11,7 @@ class MinimumRedundancyMaximumRelevance(BaselineFeatureSelector):
 
     __name__ = "MRMR"
 
-    def _select_features(
+    def select(
             self,
             X_train: pd.DataFrame,
             y_train: pd.Series,

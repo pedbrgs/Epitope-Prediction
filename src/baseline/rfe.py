@@ -21,7 +21,7 @@ class RecursiveFeatureElimination(BaselineFeatureSelector):
 
     __name__ = "RFE"
 
-    def _select_features(
+    def select(
             self,
             X_train: pd.DataFrame,
             y_train: pd.Series,
