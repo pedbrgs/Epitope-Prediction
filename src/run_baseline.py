@@ -8,8 +8,12 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import balanced_accuracy_score
 
-from baseline.mrmr import MinimumRedundancyMaximumRelevance
-from baseline.rfe import RecursiveFeatureElimination
+from baseline import (
+    MutualInformationFeatureSelection,
+    MinimumRedundancyMaximumRelevance,
+    RecursiveFeatureElimination,
+    SequentialFeatureSelection
+)
 from data.splitting import input_output_split, train_test_split
 from data.utils import read_parquet_data
 from evaluation.metrics import compute_stability_jaccard
@@ -32,8 +36,10 @@ def parse_args():
 
 def init_baseline(args):
     BASELINE_OPTIONS = {
+        "mi": MutualInformationFeatureSelection,
         "mrmr": MinimumRedundancyMaximumRelevance,
-        "rfe": RecursiveFeatureElimination
+        "rfe": RecursiveFeatureElimination,
+        "sfs": SequentialFeatureSelection,
     }
     name = args.baseline_name.lower()
     if name in BASELINE_OPTIONS.keys():
