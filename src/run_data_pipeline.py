@@ -124,7 +124,7 @@ def main(args):
     print(f"Number of training samples: {n_training_samples}")
     print(f"Number of test samples: {n_test_samples}")
 
-    print("Saving sequence dataset...")
+    print("Saving tabular dataset...")
     filename = args.data_path.split("/")[-1].split(".")[0]
     filename = f"{filename}_subsampled" if args.subsampling else filename
     output_path = os.path.join(args.output_path, f"{filename}.parquet")
