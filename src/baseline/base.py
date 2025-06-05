@@ -14,8 +14,6 @@ class BaselineFeatureSelector(ABC):
     ----------
     estimator : ClassifierMixin
         An unfitted classifier with `predict` and `predict_proba` methods.
-    eval_function : Callable
-        A function with signature `eval_function(y_true, y_pred)` that returns a scalar score.
     random_state : int, optional
         Random seed used to initialize the estimator and/or selector, by default 1234.
     """
@@ -23,12 +21,10 @@ class BaselineFeatureSelector(ABC):
     def __init__(
         self,
         estimator: ClassifierMixin,
-        eval_function: Callable,
         random_state: int = 1234
     ):
         """Init baseline class."""
         self.base_estimator = estimator
-        self.eval_function = eval_function
         self.random_state = random_state
 
     @abstractmethod
@@ -38,7 +34,9 @@ class BaselineFeatureSelector(ABC):
         Parameters
         ----------
         X_train : pd.DataFrame
-        y_train : pd.Series
+            DataFrame containing all feature columns.
+        y_train : pd.DataFrame
+            Series or DataFrame with the target variable.
         n_features : int
         **kwargs : dict
             Additional arguments required by the specific selector.
@@ -90,6 +88,7 @@ class BaselineFeatureSelector(ABC):
         self,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
+        eval_function: Callable,
         folds: pd.Series,
         feature_cols: List[str],
         step_size: float = 0.05,
@@ -102,6 +101,8 @@ class BaselineFeatureSelector(ABC):
             DataFrame containing all feature columns.
         y_train : pd.DataFrame
             Series or DataFrame with the target variable.
+        eval_function : Callable
+            A function with signature `eval_function(y_true, y_pred)` that returns a scalar score.
         folds : pd.Series
             A Series indicating the fold assignment for each sample (e.g., fold IDs).
         feature_cols : List[str]
@@ -165,13 +166,13 @@ class BaselineFeatureSelector(ABC):
 
                 # Predict and evaluate
                 y_pred = estimator.predict(X_train[selected_features][fold_val])
-                score = self.eval_function(y_true=y_train[fold_val], y_pred=y_pred)
+                score = eval_function(y_true=y_train[fold_val], y_pred=y_pred)
                 fold_scores.append(score)
 
                 del estimator
 
             cv_score, cv_std = round(np.mean(fold_scores), 4), round(np.std(fold_scores), 4)
-            print(f"{self.eval_function.__name__}: {cv_score} +- {cv_std}")
+            print(f"{eval_function.__name__}: {cv_score} +- {cv_std}")
 
             k_values.append(k)
             cv_scores.append(cv_score)

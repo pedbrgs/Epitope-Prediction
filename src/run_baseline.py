@@ -12,7 +12,8 @@ from baseline import (
     MutualInformationFeatureSelection,
     MinimumRedundancyMaximumRelevance,
     RecursiveFeatureElimination,
-    SequentialFeatureSelection
+    SequentialFeatureSelection,
+    PLSRegressorVIP
 )
 from data.splitting import input_output_split, train_test_split
 from utils.data import read_parquet_data
@@ -45,12 +46,12 @@ def init_baseline(args):
         "mrmr": MinimumRedundancyMaximumRelevance,
         "rfe": RecursiveFeatureElimination,
         "sfs": SequentialFeatureSelection,
+        "plsvip": PLSRegressorVIP
     }
     name = args.baseline_name.lower()
     if name in BASELINE_OPTIONS.keys():
         baseline = BASELINE_OPTIONS[name](
             estimator=RandomForestClassifier(random_state=args.random_state, n_jobs=-1),
-            eval_function=balanced_accuracy_score,
             random_state=args.random_state
         )
     else:
@@ -79,6 +80,7 @@ def main(args):
     logs = baseline.tune(
         X_train=X_train,
         y_train=y_train,
+        eval_function=balanced_accuracy_score,
         folds=train_data[args.split_col],
         feature_cols=feature_cols,
         step_size=args.step_size
