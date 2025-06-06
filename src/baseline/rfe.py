@@ -7,17 +7,7 @@ from .base import BaselineFeatureSelector
 
 
 class RecursiveFeatureElimination(BaselineFeatureSelector):
-    """Recursive Feature Elimination (RFE) feature selection algorithm.
-
-    Attributes
-    ----------
-    estimator : ClassifierMixin
-        A fitted classifier with `predict` and `predict_proba` methods.
-    eval_function : Callable
-        A function with signature `eval_function(y_true, y_pred)` that returns a scalar score.
-    random_state : int, optional
-        Random seed used to initialize the estimator, by default 42.
-    """
+    """Recursive Feature Elimination (RFE) feature selection algorithm."""
 
     __name__ = "RFE"
 
