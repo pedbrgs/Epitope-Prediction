@@ -15,7 +15,6 @@ from utils.artifacts import save_results, save_summary, summarize_results
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-path", type=str, help=".parquet data path")
-    parser.add_argument("--dataset-name", type=str, help="dataset name")
     parser.add_argument("--ccea-name", type=str, help="ccea name")
     parser.add_argument("--class-col", type=str, default="label", help="class column name")
     parser.add_argument("--subset-col", type=str, default="subset", help="subset column name")
@@ -85,15 +84,15 @@ def get_ccea_conf(random_state) -> dict:
     }
 
 
-def get_dataloader(args, data_conf) -> DataLoader:
+def get_dataloader(args, dataset_name, data_conf) -> DataLoader:
     # Set the new dataset
-    DataLoader.DATASETS[args.dataset_name] = {
+    DataLoader.DATASETS[dataset_name] = {
         "file": args.data_path,
         "task": "classification"
     }
     # Return the dataloader object
     dataloader = DataLoader(
-        dataset=args.dataset_name,
+        dataset=dataset_name,
         conf=data_conf
     )
     return dataloader
@@ -116,6 +115,7 @@ def init_ccea(args, dataloader, ccea_conf):
 
 
 def main(args):
+    dataset_name = args.data_path.split("/")[-1].split(".")[0]
 
     all_results = []
     all_selected_features = []
@@ -128,7 +128,7 @@ def main(args):
 
         # Build dataloader
         data_conf = get_data_conf(random_state)
-        dataloader = get_dataloader(args, data_conf)
+        dataloader = get_dataloader(args, dataset_name, data_conf)
         dataloader.get_ready()
 
         # Run CCEA
@@ -160,7 +160,7 @@ def main(args):
             selected_features=selected_features,
             total_features=dataloader.n_features,
             method=args.ccea_name,
-            dataset_name=args.dataset_name,
+            dataset_name=dataset_name,
             model_name="random_forest",
             label_col=args.class_col
         )
@@ -177,18 +177,18 @@ def main(args):
     results_df = pd.concat(all_results, ignore_index=True)
 
     # Save detailed results
-    save_results(results_df, args.output_path, args.ccea_name, args.dataset_name)
+    save_results(results_df, args.output_path, args.ccea_name, dataset_name)
 
     # Summarize and save
     summary_df = summarize_results(
         results_df=results_df,
         all_selected_features=all_selected_features,
         baseline_name=args.ccea_name,
-        dataset_name=args.dataset_name,
+        dataset_name=dataset_name,
         n_runs=args.n_runs,
         total_features=dataloader.n_features
     )
-    save_summary(summary_df, args.output_path, args.ccea_name, args.dataset_name)
+    save_summary(summary_df, args.output_path, args.ccea_name, dataset_name)
 
     print("Done.")
 
