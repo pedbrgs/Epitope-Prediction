@@ -9,17 +9,7 @@ from .base import BaselineFeatureSelector
 
 
 class PLSRegressorVIP(BaselineFeatureSelector):
-    """Partial Least Squares (PLS) with Variable Importance in Projection (VIP) feature selection.
-
-    Attributes
-    ----------
-    estimator : ClassifierMixin
-        A fitted classifier with `predict` and `predict_proba` methods.
-    eval_function : Callable
-        A function with signature `eval_function(y_true, y_pred)` that returns a scalar score.
-    random_state : int, optional
-        Random seed used to initialize the estimator, by default 42.
-    """
+    """Partial Least Squares (PLS) with Variable Importance in Projection (VIP)."""
 
     __name__ = "PLS+VIP"
 
