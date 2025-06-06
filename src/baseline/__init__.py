@@ -1,5 +1,6 @@
 from .mi import MutualInformationFeatureSelection
 from .mrmr import MinimumRedundancyMaximumRelevance
+from .pca import PrincipalComponentAnalysis
 from .plsvip import PLSRegressorVIP
 from .rfe import RecursiveFeatureElimination
 from .sfs import SequentialFeatureSelection
@@ -9,5 +10,6 @@ __all__ = [
     "MinimumRedundancyMaximumRelevance",
     "RecursiveFeatureElimination",
     "SequentialFeatureSelection",
-    "PLSRegressorVIP"
+    "PLSRegressorVIP",
+    "PrincipalComponentAnalysis"
 ]
