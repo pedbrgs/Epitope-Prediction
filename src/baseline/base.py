@@ -153,7 +153,8 @@ class BaselineFeatureSelector(ABC):
                     X_train=X_train[fold_train],
                     y_train=y_train[fold_train],
                     n_features=k,
-                    estimator=estimator
+                    estimator=estimator,
+                    variance_threshold=0.95
                 )
 
                 # Train an estimator

@@ -13,7 +13,8 @@ from baseline import (
     MinimumRedundancyMaximumRelevance,
     RecursiveFeatureElimination,
     SequentialFeatureSelection,
-    PLSRegressorVIP
+    PLSRegressorVIP,
+    PrincipalComponentAnalysis
 )
 from data.splitting import input_output_split, train_test_split
 from utils.data import read_parquet_data
@@ -46,7 +47,8 @@ def init_baseline(args):
         "mrmr": MinimumRedundancyMaximumRelevance,
         "rfe": RecursiveFeatureElimination,
         "sfs": SequentialFeatureSelection,
-        "plsvip": PLSRegressorVIP
+        "plsvip": PLSRegressorVIP,
+        "pca": PrincipalComponentAnalysis
     }
     name = args.baseline_name.lower()
     if name in BASELINE_OPTIONS.keys():
@@ -111,7 +113,8 @@ def main(args):
             X_train=X_train,
             y_train=y_train,
             n_features=logs["best_k"],
-            estimator=estimator
+            estimator=estimator,
+            variance_threshold=0.95
         )
         run_time = time.time() - start_time
 
