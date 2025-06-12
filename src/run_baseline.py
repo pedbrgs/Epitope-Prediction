@@ -78,6 +78,7 @@ def main(args):
     print("Tuning baseline algorithm...")
     baseline = init_baseline(args)
 
+    start_time = time.time()
     logs = baseline.tune(
         X_train=X_train,
         y_train=y_train,
@@ -86,6 +87,8 @@ def main(args):
         step_size=args.step_size,
         normalization_method=args.normalization_method
     )
+    tuning_runtime = time.time() - start_time
+    print(f"Tuning completed in {tuning_runtime:.2f} seconds.")
 
     save_tuning_logs(
         logs=logs,
@@ -122,7 +125,8 @@ def main(args):
             estimator=estimator,
             variance_threshold=0.95
         )
-        run_time = time.time() - start_time
+        feature_selection_runtime = time.time() - start_time
+        print(f"Feature selection completed in {feature_selection_runtime:.2f} seconds.")
 
         best_estimator = baseline.fit(
             X_train=X_scaled_train,
@@ -147,7 +151,8 @@ def main(args):
         result["run"] = run
         result["random_state"] = random_state
         result["selected_features"] = json.dumps(selected_features)
-        result["runtime_sec"] = run_time
+        result["tuning_runtime"] = tuning_runtime
+        result["feature_selection_runtime"] = feature_selection_runtime
 
         all_results.append(result)
         all_selected_features.append(set(selected_features))
