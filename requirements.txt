@@ -1,2 +1,3 @@
 pyccea
 mrmr-selection==0.2.8
+polars-lts-cpu==1.30.0
