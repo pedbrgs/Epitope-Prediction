@@ -6,13 +6,13 @@ from sklearn.base import ClassifierMixin
 
 def holdout_eval(
     model: ClassifierMixin,
-    test_data: pd.DataFrame,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
     selected_features: List[str],
     total_features: int,
     method: str,
     dataset_name: str,
     model_name: str,
-    label_col: str = "label"
 ) -> pd.DataFrame:
     """Evaluate a fitted classifier on a hold-out test set using selected features.
 
@@ -20,8 +20,10 @@ def holdout_eval(
     ----------
     model : ClassifierMixin
         A fitted classifier with `predict` and `predict_proba` methods.
-    test_data : pd.DataFrame
-        DataFrame containing the test data, including features and label.
+    X_test : pd.DataFrame
+        DataFrame containing the test features.
+    y_test : pd.Series
+        Series containing the true labels for the test set.
     selected_features : list of str
         List of feature names selected for evaluation.
     total_features : int
@@ -32,8 +34,6 @@ def holdout_eval(
         Name of the dataset used for evaluation.
     model_name : str
         Name of the machine learning model used (e.g., "random_forest").
-    label_col : str, optional
-        Name of the column containing class labels. Default is "label".
 
     Returns
     -------
@@ -46,8 +46,7 @@ def holdout_eval(
         - p_eng_features : float
         - p_deep_features : float
     """
-    X_test_selected = test_data[selected_features].copy()
-    y_test = test_data[label_col].copy()
+    X_test_selected = X_test[selected_features].copy()
 
     y_test_pred = model.predict(X_test_selected)
     y_test_proba_pred = model.predict_proba(X_test_selected)[:, 1]

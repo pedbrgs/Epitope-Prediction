@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 import random
 import time
 
@@ -8,23 +7,16 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import balanced_accuracy_score
 
-from baseline import (
-    MutualInformationFeatureSelection,
-    MinimumRedundancyMaximumRelevance,
-    RecursiveFeatureElimination,
-    SequentialFeatureSelection,
-    PLSRegressorVIP,
-    PrincipalComponentAnalysis
-)
+from baseline import (MinimumRedundancyMaximumRelevance,
+                      MutualInformationFeatureSelection, PLSRegressorVIP,
+                      PrincipalComponentAnalysis, RecursiveFeatureElimination,
+                      SequentialFeatureSelection)
+from data.normalization import normalize_data
 from data.splitting import input_output_split, train_test_split
-from utils.data import read_parquet_data
 from evaluation.testing import holdout_eval
-from utils.artifacts import (
-    save_results,
-    save_summary,
-    save_tuning_logs,
-    summarize_results
-)
+from utils.artifacts import (save_results, save_summary, save_tuning_logs,
+                             summarize_results)
+from utils.data import read_parquet_data
 
 
 def parse_args():
@@ -38,6 +30,7 @@ def parse_args():
     parser.add_argument("--random-state", type=int, default=1234, help="random seed")
     parser.add_argument("--output-path", type=str, help="output data path")
     parser.add_argument("--n-runs", type=int, default=30, help="number of runs")
+    parser.add_argument("--normalization-method", type=str, help="normalization method")
     return parser.parse_args()
 
 
@@ -76,6 +69,12 @@ def main(args):
         class_col=args.class_col
     )
 
+    X_test, y_test = input_output_split(
+        data=test_data,
+        feature_cols=feature_cols,
+        class_col=args.class_col
+    )
+
     print("Tuning baseline algorithm...")
     baseline = init_baseline(args)
 
@@ -84,8 +83,8 @@ def main(args):
         y_train=y_train,
         eval_function=balanced_accuracy_score,
         folds=train_data[args.split_col],
-        feature_cols=feature_cols,
-        step_size=args.step_size
+        step_size=args.step_size,
+        normalization_method=args.normalization_method
     )
 
     save_tuning_logs(
@@ -108,9 +107,16 @@ def main(args):
 
         estimator = RandomForestClassifier(random_state=random_state, n_jobs=-1)
 
+        # Normalize the training data and test data
+        X_scaled_train, X_scaled_test = normalize_data(
+            X_train=X_train,
+            X_test=X_test,
+            method=args.normalization_method
+        )
+
         start_time = time.time()
         selected_features = baseline.select(
-            X_train=X_train,
+            X_train=X_scaled_train,
             y_train=y_train,
             n_features=logs["best_k"],
             estimator=estimator,
@@ -119,7 +125,7 @@ def main(args):
         run_time = time.time() - start_time
 
         best_estimator = baseline.fit(
-            X_train=X_train,
+            X_train=X_scaled_train,
             y_train=y_train,
             estimator=estimator,
             selected_features=selected_features
@@ -128,13 +134,13 @@ def main(args):
         print("Evaluating model...")
         result = holdout_eval(
             model=best_estimator,
-            test_data=test_data,
+            X_test=X_scaled_test,
+            y_test=y_test,
             selected_features=selected_features,
             total_features=len(feature_cols),
             method=baseline.__name__,
             dataset_name=dataset_name,
-            model_name="random_forest",
-            label_col=args.class_col
+            model_name="random_forest"
         )
 
         # Add run-specific info and runtime

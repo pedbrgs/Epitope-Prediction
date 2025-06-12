@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from sklearn.base import ClassifierMixin
 
+from data.normalization import normalize_data
+
 
 class BaselineFeatureSelector(ABC):
     """An abstract class for a baseline feature selection algorithm.
@@ -90,8 +92,8 @@ class BaselineFeatureSelector(ABC):
         y_train: pd.DataFrame,
         eval_function: Callable,
         folds: pd.Series,
-        feature_cols: List[str],
         step_size: float = 0.05,
+        normalization_method: str = "minmax"
     ) -> dict:
         """Get best number of selected features using K-Fold CV with a general estimator.
 
@@ -105,10 +107,13 @@ class BaselineFeatureSelector(ABC):
             A function with signature `eval_function(y_true, y_pred)` that returns a scalar score.
         folds : pd.Series
             A Series indicating the fold assignment for each sample (e.g., fold IDs).
-        feature_cols : List[str]
-            The list of feature names.
         step_size : float
             The step size of number of selected features.
+        normalization_method : str
+            The normalization method to use. Options are:
+            - 'standard' : StandardScaler (mean=0, std=1)
+            - 'minmax' : MinMaxScaler (scale to [0, 1])
+            - 'robust' : RobustScaler (scale using median and IQR)
 
     Returns
     -------
@@ -123,11 +128,13 @@ class BaselineFeatureSelector(ABC):
             - cv_stds (List[float]): The list of standard deviations of the cross-validation
             scores for each k value.
         """
+        print(f"Normalization method: {normalization_method}.")
         k_values = []
         cv_scores = []
         cv_stds = []
 
-        n_features = len(feature_cols)
+        n_features = X_train.shape[1]
+        print(f"Number of features: {n_features}")
 
         # Calculate k values from s% to (100-s)% of features
         n_steps = int(1.0 / step_size)
@@ -148,9 +155,16 @@ class BaselineFeatureSelector(ABC):
                 fold_train = folds != fold
                 fold_val = folds == fold
 
+                # Normalize the training and validation input data
+                X_scaled_train_fold, X_scaler_val_fold = normalize_data(
+                    X_train=X_train[fold_train],
+                    X_test=X_train[fold_val],
+                    method=normalization_method
+                )
+
                 # Run feature selection
                 selected_features = self.select(
-                    X_train=X_train[fold_train],
+                    X_train=X_scaled_train_fold,
                     y_train=y_train[fold_train],
                     n_features=k,
                     estimator=estimator,
@@ -159,14 +173,14 @@ class BaselineFeatureSelector(ABC):
 
                 # Train an estimator
                 estimator = self.fit(
-                    X_train=X_train[fold_train],
+                    X_train=X_scaled_train_fold,
                     y_train=y_train[fold_train],
                     estimator=estimator,
                     selected_features=selected_features
                 )
 
                 # Predict and evaluate
-                y_pred = estimator.predict(X_train[selected_features][fold_val])
+                y_pred = estimator.predict(X_scaler_val_fold[selected_features])
                 score = eval_function(y_true=y_train[fold_val], y_pred=y_pred)
                 fold_scores.append(score)
 
