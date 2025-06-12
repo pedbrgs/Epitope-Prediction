@@ -62,10 +62,13 @@ def summarize_results(
     summary_data["model"] = "random_forest"
     summary_data["n_runs"] = n_runs
     summary_data["stability"] = f"{stability:.4f}"
-    # add average runtime per run
-    summary_data["avg_runtime_sec"] = (
-        f"{results_df['runtime_sec'].mean():.2f} ± "
-        f"{results_df['runtime_sec'].std():.2f}"
+    summary_data["avg_tuning_runtime"] = (
+        f"{results_df['tuning_runtime'].mean():.2f} ± "
+        f"{results_df['tuning_runtime'].std():.2f}"
+    )
+    summary_data["avg_feature_selection_runtime"] = (
+        f"{results_df['feature_selection_runtime'].mean():.2f} ± "
+        f"{results_df['feature_selection_runtime'].std():.2f}"
     )
 
     for col in numeric_cols:
