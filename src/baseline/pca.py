@@ -3,7 +3,6 @@ from typing import List
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 from .base import BaselineFeatureSelector
 
@@ -25,7 +24,7 @@ class PrincipalComponentAnalysis(BaselineFeatureSelector):
         Parameters
         ----------
         X_train : pd.DataFrame
-            Training feature matrix.
+            Training feature matrix (already scaled).
         y_train : pd.Series
             Training target labels (not used in PCA, but kept for API consistency or future use).
         n_features : int
@@ -40,10 +39,9 @@ class PrincipalComponentAnalysis(BaselineFeatureSelector):
         List[str]
             A list of selected feature names.
         """
-        X_scaled = StandardScaler().fit_transform(X_train)
         # Full PCA to analyze all components
         pca = PCA(n_components=min(X_train.shape))
-        pca.fit(X_scaled)
+        pca.fit(X_train)
         # PCA identifies directions (components) with the most variance. Features with high
         # absolute loadings in top components are considered important because they contribute
         # more to the major variance in the data.
