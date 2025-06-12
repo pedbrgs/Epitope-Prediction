@@ -177,4 +177,6 @@ def main(args):
 
 
 if __name__ == "__main__":
+    print("Starting experiment...")
     main(parse_args())
+    print("Experiment completed successfully.")
