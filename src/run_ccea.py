@@ -44,7 +44,7 @@ def get_data_conf(random_state) -> dict:
 def get_ccea_conf(random_state) -> dict:
     return {
         "coevolution": {
-            "subpop_sizes": [30],
+            "subpop_sizes": [10],
             "max_gen": 10000,
             "max_gen_without_improvement": 100,
             "optimized_resource_allocation": True,
@@ -64,8 +64,8 @@ def get_ccea_conf(random_state) -> dict:
         },
         "wrapper": {
             "task": "classification",
-            # "model_type": "random_forest",
-            "model_type": "k_nearest_neighbors"
+            "model_type": "random_forest",
+            # "model_type": "k_nearest_neighbors"
         },
         "evaluation": {
             "fitness_function": "penalty",
@@ -170,6 +170,8 @@ def main(args):
         result["random_state"] = random_state
         result["selected_features"] = json.dumps(selected_features)
         result["runtime_sec"] = run_time
+        result["pre_removed_features"] = json.dumps(ccea.removed_features.tolist())
+        result["n_pre_removed_features"] = len(ccea.removed_features)
 
         all_results.append(result)
         all_selected_features.append(set(selected_features))
