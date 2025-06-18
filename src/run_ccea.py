@@ -148,20 +148,23 @@ def main(args):
         if args.ccea_name.upper() in ["CCPSTFG"]:
             kept_feature_indices = set(range(len(feature_cols))).difference(ccea.removed_features)
             kept_feature_names = dataloader.data.columns[list(kept_feature_indices)]
-            selected_features = kept_feature_names[ccea.best_context_vector.astype(bool)].tolist()
+            # Decomposition step reordered the features, so we need to sort them
+            kept_sorted_feature_names = kept_feature_names[ccea.feature_idxs]
+            selected_features = kept_sorted_feature_names[ccea.best_context_vector.astype(bool)].tolist()
             X_train_selected = dataloader.data.query("subset == 'train'")[selected_features].copy()
         else:
-            pass
+            raise ValueError(f"The {args.ccea_name.upper()} is not implemented for epitope prediction.")
 
         estimator = RandomForestClassifier(random_state=random_state, n_jobs=-1)
         best_estimator = estimator.fit(X_train_selected, dataloader.y_train)
 
         print("Evaluating model...")
-        test_data = dataloader.data.loc[dataloader.data[args.subset_col] == "test"].copy()
+        X_test = dataloader.data.query("subset == 'test'")[feature_cols].copy()
+        y_test = dataloader.data.query("subset == 'test'")[args.class_col].copy()
         result = holdout_eval(
             model=best_estimator,
-            X_test=ccea.data.X_test,
-            y_test=ccea.data.y_test,
+            X_test=X_test,
+            y_test=y_test,
             selected_features=selected_features,
             total_features=dataloader.n_features,
             method=args.ccea_name,
