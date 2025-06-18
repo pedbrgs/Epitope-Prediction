@@ -134,10 +134,12 @@ def main(args):
         # Run CCEA
         print("Selecting features...")
         ccea_conf = get_ccea_conf(random_state)
+        start_time = time.time()
         ccea = init_ccea(args, dataloader, ccea_conf)
+        init_runtime = time.time() - start_time
         start_time = time.time()
         ccea.optimize()
-        run_time = time.time() - start_time
+        feature_selection_runtime = time.time() - start_time
 
         # Select the name of the best features
         feature_cols = [col for col in dataloader.data.columns if col.startswith("feat_")]
@@ -168,9 +170,13 @@ def main(args):
         # Add run-specific info and runtime
         result["run"] = run
         result["random_state"] = random_state
+        result["wrapper_model"] = ccea_conf["wrapper"]["model_type"]
+        result["subset_size_penalty"] = ccea_conf["evaluation"]["weights"][1]
         result["selected_features"] = json.dumps(selected_features)
-        result["runtime_sec"] = run_time
+        result["feature_selection_runtime"] = feature_selection_runtime
+        result["tuning_runtime"] = ccea._tuning_time
         result["pre_removed_features"] = json.dumps(ccea.removed_features.tolist())
+        result["init_runtime"] = init_runtime
         result["n_pre_removed_features"] = len(ccea.removed_features)
 
         all_results.append(result)
