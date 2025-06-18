@@ -136,10 +136,12 @@ def main(args):
         ccea_conf = get_ccea_conf(random_state)
         start_time = time.time()
         ccea = init_ccea(args, dataloader, ccea_conf)
+        print(f"Tuning completed in {ccea._tuning_time:.2f} seconds.")
         init_runtime = time.time() - start_time
         start_time = time.time()
         ccea.optimize()
         feature_selection_runtime = time.time() - start_time
+        print(f"Feature selection completed in {feature_selection_runtime:.2f} seconds.")
 
         # Select the name of the best features
         feature_cols = [col for col in dataloader.data.columns if col.startswith("feat_")]
@@ -158,7 +160,8 @@ def main(args):
         test_data = dataloader.data.loc[dataloader.data[args.subset_col] == "test"].copy()
         result = holdout_eval(
             model=best_estimator,
-            test_data=test_data,
+            X_test=ccea.data.X_test,
+            y_test=ccea.data.y_test,
             selected_features=selected_features,
             total_features=dataloader.n_features,
             method=args.ccea_name,
