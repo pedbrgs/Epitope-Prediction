@@ -172,6 +172,7 @@ def main(args):
         result["random_state"] = random_state
         result["wrapper_model"] = ccea_conf["wrapper"]["model_type"]
         result["subset_size_penalty"] = ccea_conf["evaluation"]["weights"][1]
+        result["max_removal_quantile"] = ccea_conf["decomposition"]["max_removal_quantile"]
         result["selected_features"] = json.dumps(selected_features)
         result["feature_selection_runtime"] = feature_selection_runtime
         result["tuning_runtime"] = ccea._tuning_time
