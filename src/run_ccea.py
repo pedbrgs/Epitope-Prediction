@@ -167,7 +167,6 @@ def main(args):
             method=args.ccea_name,
             dataset_name=dataset_name,
             model_name="random_forest",
-            label_col=args.class_col
         )
 
         # Add run-specific info and runtime
