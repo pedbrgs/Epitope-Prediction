@@ -2,6 +2,7 @@ import argparse
 import json
 import random
 import time
+import gc
 
 import pandas as pd
 from pyccea.coevolution import CCPSTFG
@@ -64,8 +65,8 @@ def get_ccea_conf(random_state) -> dict:
         },
         "wrapper": {
             "task": "classification",
-            "model_type": "random_forest",
-            # "model_type": "k_nearest_neighbors"
+            #"model_type": "random_forest",
+            "model_type": "k_nearest_neighbors"
         },
         "evaluation": {
             "fitness_function": "penalty",
@@ -187,6 +188,9 @@ def main(args):
 
         all_results.append(result)
         all_selected_features.append(set(selected_features))
+
+        del ccea, dataloader, X_train_selected, best_estimator, X_test, y_test, result
+        gc.collect()
 
     results_df = pd.concat(all_results, ignore_index=True)
 
