@@ -1,3 +1,4 @@
+import multiprocessing
 import argparse
 import json
 import random
@@ -115,101 +116,123 @@ def init_ccea(args, dataloader, ccea_conf):
     return ccea
 
 
-def main(args):
+def run_single(args, run):
     dataset_name = args.data_path.split("/")[-1].split(".")[0]
 
+    random_state = random.randint(0, 10_000)
+
+    # Build dataloader
+    data_conf = get_data_conf(random_state)
+    dataloader = get_dataloader(args, dataset_name, data_conf)
+    dataloader.get_ready()
+    n_features = dataloader.n_features
+
+    # Run CCEA
+    ccea_conf = get_ccea_conf(random_state)
+    start_time = time.time()
+    ccea = init_ccea(args, dataloader, ccea_conf)
+    init_runtime = time.time() - start_time
+    start_time = time.time()
+    ccea.optimize()
+    feature_selection_runtime = time.time() - start_time
+
+    # Select best features
+    feature_cols = [col for col in dataloader.data.columns if col.startswith("feat_")]
+    kept_feature_indices = set(range(len(feature_cols))).difference(ccea.removed_features)
+    kept_feature_names = dataloader.data.columns[list(kept_feature_indices)]
+    # Decomposition step reordered the features, so we need to sort them
+    kept_sorted_feature_names = kept_feature_names[ccea.feature_idxs]
+    selected_features = kept_sorted_feature_names[ccea.best_context_vector.astype(bool)].tolist()
+    X_train_selected = dataloader.data.query("subset == 'train'")[selected_features].copy()
+
+    estimator = RandomForestClassifier(random_state=random_state, n_jobs=1)
+    best_estimator = estimator.fit(X_train_selected, dataloader.y_train)
+
+    X_test = dataloader.data.query("subset == 'test'")[feature_cols].copy()
+    y_test = dataloader.data.query("subset == 'test'")[args.class_col].copy()
+    result = holdout_eval(
+        model=best_estimator,
+        X_test=X_test,
+        y_test=y_test,
+        selected_features=selected_features,
+        total_features=n_features,
+        method=args.ccea_name,
+        dataset_name=dataset_name,
+        model_name="random_forest",
+    )
+
+    # Add metadata
+    result["run"] = run
+    result["random_state"] = random_state
+    result["wrapper_model"] = ccea_conf["wrapper"]["model_type"]
+    result["subset_size_penalty"] = ccea_conf["evaluation"]["weights"][1]
+    result["max_removal_quantile"] = ccea_conf["decomposition"]["max_removal_quantile"]
+    result["selected_features"] = json.dumps(selected_features)
+    result["feature_selection_runtime"] = feature_selection_runtime
+    result["tuning_runtime"] = ccea._tuning_time
+    result["pre_removed_features"] = json.dumps(ccea.removed_features.tolist())
+    result["init_runtime"] = init_runtime
+    result["n_pre_removed_features"] = len(ccea.removed_features)
+
+    # Cleanup
+    del ccea, dataloader, X_train_selected, best_estimator, X_test, y_test
+    gc.collect()
+
+    return result, set(selected_features), n_features
+
+
+def run_worker(args, run, output_path):
+    result, selected_features, n_features = run_single(args, run)
+    queue = multiprocessing.Queue()
+    queue.put((result, selected_features, n_features))
+    return queue
+
+
+def wrapper(queue, args, run):
+    result = run_single(args, run)
+    queue.put(result)
+
+
+def main(args):
     all_results = []
     all_selected_features = []
+    n_features = None
+    dataset_name = args.data_path.split("/")[-1].split(".")[0]
 
-    print("Running multiple runs...")
     for run in range(args.n_runs):
-        print(f"Run {run + 1}/{args.n_runs}...")
+        manager = multiprocessing.Manager()
+        queue = manager.Queue()
 
-        random_state = random.randint(0, 10_000)
+        p = multiprocessing.Process(target=wrapper, args=(queue, args, run))
+        p.start()
+        p.join()
 
-        # Build dataloader
-        data_conf = get_data_conf(random_state)
-        dataloader = get_dataloader(args, dataset_name, data_conf)
-        dataloader.get_ready()
-
-        # Run CCEA
-        print("Selecting features...")
-        ccea_conf = get_ccea_conf(random_state)
-        start_time = time.time()
-        ccea = init_ccea(args, dataloader, ccea_conf)
-        print(f"Tuning completed in {ccea._tuning_time:.2f} seconds.")
-        init_runtime = time.time() - start_time
-        start_time = time.time()
-        ccea.optimize()
-        feature_selection_runtime = time.time() - start_time
-        print(f"Feature selection completed in {feature_selection_runtime:.2f} seconds.")
-
-        # Select the name of the best features
-        feature_cols = [col for col in dataloader.data.columns if col.startswith("feat_")]
-        if args.ccea_name.upper() in ["CCPSTFG"]:
-            kept_feature_indices = set(range(len(feature_cols))).difference(ccea.removed_features)
-            kept_feature_names = dataloader.data.columns[list(kept_feature_indices)]
-            # Decomposition step reordered the features, so we need to sort them
-            kept_sorted_feature_names = kept_feature_names[ccea.feature_idxs]
-            selected_features = kept_sorted_feature_names[ccea.best_context_vector.astype(bool)].tolist()
-            X_train_selected = dataloader.data.query("subset == 'train'")[selected_features].copy()
+        if not queue.empty():
+            result, selected_features, n_features_run = queue.get()
+            all_results.append(result)
+            all_selected_features.append(selected_features)
+            if n_features is None:
+                n_features = n_features_run
+            print(f"[✓] Run {run + 1}/{args.n_runs} completed successfully.")
         else:
-            raise ValueError(f"The {args.ccea_name.upper()} is not implemented for epitope prediction.")
-
-        estimator = RandomForestClassifier(random_state=random_state, n_jobs=-1)
-        best_estimator = estimator.fit(X_train_selected, dataloader.y_train)
-
-        print("Evaluating model...")
-        X_test = dataloader.data.query("subset == 'test'")[feature_cols].copy()
-        y_test = dataloader.data.query("subset == 'test'")[args.class_col].copy()
-        result = holdout_eval(
-            model=best_estimator,
-            X_test=X_test,
-            y_test=y_test,
-            selected_features=selected_features,
-            total_features=dataloader.n_features,
-            method=args.ccea_name,
-            dataset_name=dataset_name,
-            model_name="random_forest",
-        )
-
-        # Add run-specific info and runtime
-        result["run"] = run
-        result["random_state"] = random_state
-        result["wrapper_model"] = ccea_conf["wrapper"]["model_type"]
-        result["subset_size_penalty"] = ccea_conf["evaluation"]["weights"][1]
-        result["max_removal_quantile"] = ccea_conf["decomposition"]["max_removal_quantile"]
-        result["selected_features"] = json.dumps(selected_features)
-        result["feature_selection_runtime"] = feature_selection_runtime
-        result["tuning_runtime"] = ccea._tuning_time
-        result["pre_removed_features"] = json.dumps(ccea.removed_features.tolist())
-        result["init_runtime"] = init_runtime
-        result["n_pre_removed_features"] = len(ccea.removed_features)
-
-        all_results.append(result)
-        all_selected_features.append(set(selected_features))
-
-        del ccea, dataloader, X_train_selected, best_estimator, X_test, y_test, result
+            print(f"[✗] Run {run + 1} did not complete successfully.")
         gc.collect()
-
     results_df = pd.concat(all_results, ignore_index=True)
-
-    # Save detailed results
     save_results(results_df, args.output_path, args.ccea_name, dataset_name)
 
-    # Summarize and save
     summary_df = summarize_results(
         results_df=results_df,
         all_selected_features=all_selected_features,
         baseline_name=args.ccea_name,
         dataset_name=dataset_name,
         n_runs=args.n_runs,
-        total_features=dataloader.n_features
+        total_features=n_features
     )
     save_summary(summary_df, args.output_path, args.ccea_name, dataset_name)
 
-    print("Done.")
+    print("[✓] All runs completed successfully.")
 
 
 if __name__ == "__main__":
-    main(parse_args())
+    args = parse_args()
+    main(args)
